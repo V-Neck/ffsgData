@@ -1,0 +1,81 @@
+---
+title: "Killed By Police"
+author: "Vaughn Johnson"
+date: "2018-12-05"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+# Killed By Police
+
+Killed By Police was maintained by some individual between 2013 and 2018.
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+
+library(here)
+library(DT)
+library(tidyr)
+
+source(here::here(file.path('R', 'Harmonizing', 'Harmonizer.R')))
+load(here::here(file.path("R", 'Harmonizing', "HarmonizedFiles","HarmonizedDataSets.RData")))
+
+fe  =  fe_harmonized
+mpv = mpv_harmonized
+kbp = kbp_harmonized
+wapo_harmonized
+min(fe_harmonized$date, na.rm=T)
+fe_harmonized[10:15, ]
+
+```
+
+
+```{r, echo=F}
+library(here)
+library(DT)
+library(tidyr)
+
+make_freq_table <- function(field, precision) {
+    freq_table = plyr::count(field)
+    
+    freq_table$'proportion' =  freq_table$freq / sum(freq_table$freq)
+    freq_table$'proportion' = round(freq_table$'proportion', 2)
+    
+    freq_table$'cumulative' = cumsum(freq_table$'proportion')
+    freq_table$'cumulative' =  round(freq_table$'cumulative', 2)
+    
+    return(freq_table)
+}
+
+display <- function(source, field) {
+    return(datatable(make_freq_table(source[,field], 3)))
+}
+```
+
+
+
+## Killed By Police
+```{r}
+display(kbp, 'name')
+display(kbp, 'age')
+display(kbp, 'race')
+display(kbp, 'sex')
+display(kbp, 'date')
+display(kbp, "aka")
+display(kbp, "number")
+display(kbp,  "date_format")
+display(kbp, "year")
+display(kbp, "month")
+display(kbp, "day")
+display(kbp, "deceased")
+display(kbp, "method")
+display(kbp, "fb_page")
+display(kbp, "fb_pic")
+display(kbp, "state")
+```

@@ -1,0 +1,30 @@
+---
+title: "Demonstration of Functionality"
+author: "Vaughn Johnson"
+date: "2019-04-05"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+````{r include=FALSE}
+library(DT)
+library(here)
+
+path_to_src = here::here(file.path("R"))
+
+# Refresh Data
+source(file.path(path_to_src, "MasterScraper.R"))
+# Harmonize Data
+source(file.path(path_to_src, "Harmonizer.R"))
+```
+
+```{r, warnings = FALSE}
+load(file.path(path_to_src, "HarmonizedFiles", "HarmonizedDataSets.RData"))
+
+datatable(fe_harmonized)
+datatable(kbp_harmonized)
+datatable(mpv_harmonized)
+```

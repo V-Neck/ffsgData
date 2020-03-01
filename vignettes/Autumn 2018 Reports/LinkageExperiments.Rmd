@@ -1,0 +1,66 @@
+---
+title: "Linkage"
+author: "Vaughn Johnson"
+date: "4/23/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Trying to Link WaPo with KBP
+
+## Setup
+```{r, echo=TRUE, include=FALSE}
+library(dplyr)
+library(here)
+library(RecordLinkage)
+
+path_to_src = here::here(file.path('R'))
+load(file.path(path_to_src,
+               "HarmonizedFiles",
+               "HarmonizedDataSets.RData"))
+
+common_cols = intersect(colnames(kbp_harmonized),
+                        colnames(wapo_harmonized))
+
+common_cols = c("name")
+ kbp_link = kbp_harmonized %>% select(common_cols) %>% filter(!is.na(name))
+wapo_link = wapo_harmonized %>% select(common_cols) %>% filter(!is.na(name))
+```
+
+## Confirm at least one observation is shared
+```{r}
+intersecting_names = intersect( kbp_harmonized$name,
+          wapo_harmonized$name)
+
+head(intersecting_names)
+
+
+# Terry Lee Cockrell is in intersection
+'Terry Lee Cockrell' %in% intersecting_names
+
+ kbp_harmonized %>% filter(name == "Terry Lee Cockrell")
+wapo_harmonized %>% filter(name == "Terry Lee Cockrell")
+```
+
+## Trying Linkage
+```{r}
+links = compare.linkage(kbp_link, wapo_link,
+                        #blockfld = c('state'), 
+                        phonetic = T)
+
+# Build similarity weights
+# between 0 and 1 for each candidate pair
+results = emWeights(links)
+
+table(results$pairs)
+```
+
+This is where we begin to run into problems:
+
+- The probabilities of a pair being a nonmatch (`results$U` in results) are all `NaN`
+- Huge amount of missing data means we never seem to have a real number for "is_match"
+- m-probabilities only go to like 128, so `results$M` is far shorter than the number of pairs
+

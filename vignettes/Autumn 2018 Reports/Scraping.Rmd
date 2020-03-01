@@ -1,0 +1,77 @@
+---
+title: "Scraping"
+author: "Vaughn Johnson"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Towards a more generalized, package oriented approach
+Over the past several months, I've made efforts to make the process of scraping
+information from our various sources of data (refered to in this document as
+**DS**) more general, modular, and maintainable. This included investigating
+new R packages, researching HTTP errors, and wrangling with working directories.
+
+## General Improvements
+The most important work I did in this area was unify the means by which a
+working directory is set / indexed. Previously, each scraping "module" (though,
+at the time, the separte **DS** hadn't been modularized) set its own working
+directory. What this meant from a software engineering perspective is that our
+working directory was a mutable field, and it was sometimes ambiguous what value
+our present working directory would have when requested from a certain region in
+the code. For example, when a scraped **DS** needed to be saved, previously,
+one would set the working directory to a certain filepath, and further add to
+that path to save the **DS**, e.g.
+
+```{r, eval=F}
+setwd('~/FFSG/.../')
+save.image(DS, getwd() + "/" + "ScrapedFiles/DS.RData")
+```
+
+The problems with this approach are
+
+1. You need to assume you're in a particular directory when `setwd` is called
+2. You need to assume the file system you're using uses `/` to delimit filepaths
+3. If you want to change the way you're files are structured, you'd need to
+account for all the places you use a file path, and change them individually.
+
+For each **DS** that we scrape, I wrapped a simple function around it, with
+[parameters](https://github.com/statnet/ffsg/blob/c2a68d77df323daea39f5de0e3cb976f1ad63351/Data/ffsgData/R/MakeFEData.R#L31) to the URL of the **DS**, and the location one wants the **DS**
+saved. What this means is that all of the problems with working directories
+can be abstracted out of the scraping code.
+
+There's still a master scraper. Within that master scraper, there logic for
+setting paths to files is handled by the package `here`, as well as the base R
+function `file.path`. A "root" directory of sorts is set in one [place](https://github.com/statnet/ffsg/blob/c2a68d77df323daea39f5de0e3cb976f1ad63351/Data/ffsgData/R/MasterScraper.R#L20), and subsequent [files are appended](https://github.com/statnet/ffsg/blob/c2a68d77df323daea39f5de0e3cb976f1ad63351/Data/ffsgData/R/MasterScraper.R#L31) to that "root".
+
+
+## US Census Data
+I encountered a strange, difficult to reproduce `HTTP 304` error, in which my
+machine would assume the files for the US Census were already cached somewhere
+in R, and not return the request for data. The problem, and possible workaround,
+are documented [here](https://github.com/statnet/ffsg/blob/02e6f54d0bd43d9261f4b5adbc1da5f03f31f559/Data/ffsgData/R/MakePopData.R#L55).
+
+## Killed By Police
+There was very little changes to the scraping of `Killed By Police`. More
+headway was made in the context harmonization. It's worth mentioning here,
+(though it is documented in other places) that `Killed By Police` stopped
+updating in May 2018.
+
+## Mapping Police Violence
+Outside of the general improvements listed above, little was changed for this
+data source. The URL to the data source had changed, which was easy to fix
+because of the new `url` parameter.
+
+## Fatal Encounters
+In the same vein as `Mapping Police Violence`, little changes outside of the
+general improvments were needed here.
+
+## New File structure
+I've tried to line up scraping, harmonization, merging, etc. in a way which is 
+conducive to publish the bundle of code as a package. To that extent, scraped
+files now live within `ScrapedFiles` in the `R` directory in the `ffsgData`
+project.

@@ -1,0 +1,192 @@
+---
+title: "Record Linkage"
+author: "Vaughn Johnson"
+date: "4/30/2019"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Set Up
+```{r, warning=FALSE, message=FALSE}
+library(ggplot2)
+library(dplyr)
+library(here)
+library(RecordLinkage)
+
+path_to_src = here::here(file.path('R'))
+load(file.path(path_to_src,
+               "HarmonizedFiles",
+               "HarmonizedDataSets.RData"))
+
+common_cols = intersect(colnames(kbp_harmonized),
+                        colnames(wapo_harmonized))
+```
+
+```{r}
+colinear = c("aka", 'name', 'date', 'str_age')
+common_cols = intersect(colnames(kbp_harmonized),
+                        colnames(wapo_harmonized))
+
+kbp_link  =  kbp_harmonized %>% 
+                select(common_cols) %>% select(-colinear)
+  
+wapo_link = wapo_harmonized %>% 
+                select(common_cols) %>% select(-colinear)
+
+```
+
+Here, we confirm there is at least 1 person with the same name in both records
+```{r}
+### Confirm at least one person is present in both data sets
+intersect(wapo_link[c('firstname', 'lastname')], kbp_link[c('firstname', 'lastname')])
+```
+
+# Beginning the Record Linkage
+Each record linkage process begins with a call to `compare.dedup` or 
+`compare.linkage`. This returns an object of the class `RecLinkPairs`.
+
+`RecLinkPairs` is literally undocumented in the RecordLinkage Manual. However,
+`RecLinkData` is documented, and claims that this is the class returned by the
+`compare.X` functions. So we'll assume we're working with `RecLinkData` objects.
+
+`RecLinkData` have the following fields, though most of these are blank when you 
+call `compare.linkage`, and are only filled in by future function calls.
+
+|field|Description|Calculted by the function|
+|---|---|---|
+|`data1, data2`| Original Data Sets, unmutated. In order to even call `compare.linkage`, assume these have the same columns|`compare.linkage`|
+|`pairs`|A `data.frame`. Each row is a pair of rows from `data1` and `data2`. Each column that `data1` and `data2` share has a number between 0 and 1. 1 means exactly the same, 0 means totally orthogonal|`compare.linkage`|
+|`M`|Vector of $m$-probabilities.  $m$-probabilities are The m probability is the probability of agreement for a given matching variable when the comparison pair is a match|`emWeights`|
+|`U`|Vector of $u$-probabilities. $u$-probabilities are The probability of this variable agreeing purely by chance for a comparison pair of two records not belonging to the same individual|`emWeights`|
+|`W`| " Vector of log-likelihood weights as calculated by `emWeights`, corresponding to binary comparison patterns as created by bincombinations.|`emWeights`|
+|`Wdata`|Vector of log-likelihood weights as calculated by `emWeights`. This is the sum of the weights of each column for each pair|`emWeights`|
+
+`RecLinkData` objects are then passed to `emWeights`, which begins by doing the following
+
+Each pairs has an $mu$ and a $u$. Basically, we guess $m$ and $u$ for each pair, and find the liklihood of 
+our data based on those estiamtes. Then, we take the log of that likelihood, then the derivative,
+and set it equal to 0. We then solve for the parameters again, and plug those back into a new liklihood
+function. This process is repeated on the parameters converge. This whole process takes place
+in `emWeights`.
+
+Once we estimate as $k$ of the $m$ $u$ (two parameters for each column), we then
+compute weights for each pair using something like log-odds
+
+$$
+w_{a,k} = \frac{\ln{(m_k / u_k)}}{\ln{(2)}}
+$$
+
+$$
+w_{d,k} = \frac{\ln{((1 - m_k) / (1 - u_k))}}{\ln{(2)}}
+$$
+
+Where $a$ means agree, and $d$ means disagree. Then we sum alllll the parameters
+together for each pair, which is put in `Wdata`. The more positive, the the more 
+likely a match.
+
+```{r}
+blank_linkage_object = compare.linkage(kbp_link, 
+                                 wapo_link, 
+                                 blockfld = c('year'), 
+                                 phonetic = T,
+                                 strcmp = T)
+```
+
+```{r}
+EM_linkage_object = emWeights(blank_linkage_object)
+classify_object = emClassify(EM_linkage_object)
+
+preds = data.frame(weights = classify_object$Wdata, pred=classify_object$prediction)
+
+ggplot(preds, aes(x=weights, group=pred, fill=pred)) + 
+    geom_histogram(bins=50) +
+    ggtitle("Histogram of Weights assigned to record pairs, log scale")
+```
+
+## Clerical Review
+
+```{r}
+ps = classify_object$pairs
+same_names = ps['firstname'] == 1 & ps['lastname'] == 1 & !is.na(ps['firstname'] == 1 & ps['lastname'] == 1)
+diff_name_match = !same_names & classify_object$prediction == 'L'
+kbp_link[ps[diff_name_match, 'id1'], ]
+wapo_link[ps[diff_name_match, 'id2'], ]
+```
+
+# Deduplication
+
+```{r}
+
+```
+
+
+
+# Bibliography
+Improving EM Algorithm Estimates for Record Linkage Parameters (2002)
+- EM stuff on page 3
+
+Probabilistic record linkage and a method to calculate the positive predictive value
+- $M$ and $U$ explanations in "Record linkage methodology" section
+
+Analysis of a Probabilistic Record Linkage Technique without Human Review
+- Parameter fitting in EM in "METHODS" section
+
+
+```{r}
+common_cols = Reduce(intersect, list(colnames(kbp_harmonized),
+                                     colnames(fe_harmonized),
+                                     colnames(mpv_harmonized),
+                                     colnames(wapo_harmonized)))
+
+colinear = c("aka", 'name', 'date', 'str_age')
+
+combined_harmonized = plyr::rbind.fill(kbp_harmonized,
+                                       fe_harmonized,
+                                       mpv_harmonized,
+                                       wapo_harmonized) %>% 
+                                       select(common_cols) %>% 
+                                       select(-colinear)
+
+comb_sample = combined_harmonized %>% sample_n(1000)
+
+blank_dedup_object = compare.dedup(comb_sample, 
+                                   #blockfld = c('state'), 
+                                   phonetic = T,
+                                   strcmp = T)
+
+EM_dedup_object = emWeights(blank_dedup_object)
+classify  = emClassify(EM_dedup_object)
+
+display_matches = function(classifyObject) {
+  links = classifyObject$prediction == 'L'
+  num_matches = sum(links)
+  ncols = ncol(classifyObject$data)
+  df = data.frame(matrix(nrow = 3 * num_matches, ncol= ncols))
+  colnames(df) = colnames(classifyObject$data)
+  left  = classifyObject$pairs[links, 'id1']
+  right = classifyObject$pairs[links, 'id2']
+  print(num_matches)
+  idx1 = 3 * (0:(num_matches -1))
+  idx2  = idx1 + 1
+  blank = idx1 + 2
+  
+  df[idx1  + 1, ] = classifyObject$data[left, ]
+  df[idx2  + 1, ] = classifyObject$data[right, ]
+  df[blank + 1, ] = c(rep("", ncols))
+  
+  return(df)
+}
+
+
+preds = data.frame(weights = classify$Wdata, pred=classify$prediction)
+
+ggplot(preds, aes(x=weights, group=pred, fill=pred)) + 
+    geom_histogram(bins=50) +
+    scale_y_log10() +
+    ggtitle("Histogram of Weights assigned to record pairs, log scale")
+```

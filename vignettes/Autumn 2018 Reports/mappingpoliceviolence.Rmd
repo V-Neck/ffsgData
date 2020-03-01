@@ -1,0 +1,85 @@
+---
+title: "Mapping Police Violence"
+author: "Vaughn Johnson"
+date: "2018-12-05"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+# Mapping Mapping Police Violence
+Mapping Police Violence is "meticulously sourced from the three largest, most comprehensive and impartial crowdsourced databases on police killings in the country: FatalEncounters.org, the U.S. Police Shootings Database and KilledbyPolice.net"
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+
+library(here)
+library(DT)
+library(tidyr)
+
+source(here::here(file.path('R', 'Harmonizing', 'Harmonizer.R')))
+load(here::here(file.path("R", 'Harmonizing', "HarmonizedFiles","HarmonizedDataSets.RData")))
+
+fe  =  fe_harmonized
+mpv = mpv_harmonized
+kbp = kbp_harmonized
+```
+
+
+```{r, echo=F}
+library(here)
+library(DT)
+library(tidyr)
+
+make_freq_table <- function(field, precision) {
+    freq_table = plyr::count(field)
+    
+    freq_table$'proportion' =  freq_table$freq / sum(freq_table$freq)
+    freq_table$'proportion' = round(freq_table$'proportion', 2)
+    
+    freq_table$'cumulative' = cumsum(freq_table$'proportion')
+    freq_table$'cumulative' =  round(freq_table$'cumulative', 2)
+    
+    return(freq_table)
+}
+
+display <- function(source, field) {
+    return(datatable(make_freq_table(source[,field], 3)))
+}
+```
+
+
+
+## Mapping Police Violence
+```{r}
+display(mpv, 'name')
+display(mpv, 'aka')
+display(mpv, 'age')
+display(mpv, 'sex')
+display(mpv, 'race')
+display(mpv, 'date')
+display(mpv, 'zip')
+display(mpv, "URL of image of victim")
+display(mpv, "Street Address of Incident")
+display(mpv, "City")
+display(mpv, "State")
+display(mpv,"County")
+display(mpv,"Agency responsible for death")
+display(mpv,"Cause of death")
+display(mpv,"A brief description of the circumstances surrounding the death")
+display(mpv,"Official disposition of death (justified or other)")
+display(mpv,"Criminal Charges?")
+display(mpv, "Link to news article or photo of official document")
+display(mpv, "Symptoms of mental illness?" )
+display(mpv, "Unarmed")
+display(mpv, "Alleged Weapon (Source: WaPo)")
+display(mpv, "Alleged Threat Level (Source: WaPo)")
+display(mpv, "Fleeing (Source: WaPo)")
+display(mpv, "Body Camera (Source: WaPo)")
+display(mpv, "WaPo ID (If included in WaPo database)")
+```

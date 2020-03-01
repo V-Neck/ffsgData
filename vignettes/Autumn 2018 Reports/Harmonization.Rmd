@@ -1,0 +1,77 @@
+---
+title: "Harmonization"
+author: "Vaughn Johnson"
+output: html_document
+---
+
+# The inadequacies of previous efforts
+Over the summer, I tried to make a general purpose harmonization function
+which would take a series of key-value pairs and the like, and transform
+an arbitrary data source to meet the format we need to perform meaningful
+merging later on. I had some success in this, but it was hard to be sure 
+I was meeting all of the cases we encountered in the data.
+
+But then we finally made tables of the unique values found in the data! This
+opened up a treasure trove cases I had previously missed, and let me further
+harmonize the data. It always opened up new classes of things which can be
+harmonized, which lend themselves to being projects in 2019.
+
+## Harmonizing Nulls
+Probably the largest discovery / improvement to scraping was [the harmonization 
+of nulls](https://github.com/statnet/ffsg/blob/1d7d3450b130964676f2f747088a71c197678638/Data/ffsgData/R/Harmonizer.R#L107). In my previous designs, I had made the assumption that each data source,
+even if they did use the standard `NA` used to denote `NULL` in R, still were
+self-consistent with their use of that non-standard encoding. After tabling the
+data, it was apparent this was not the case, and so I revised the harmonization
+code to accpet a general list of encodings which all map to `NA`. This was most
+helpful in the fields for names and races.
+
+## Research into `!!!`
+In the code I wrote over the summer, I had copied and pasted some code from 
+StackOverflow which, while it worked (e.g., `mutate(race = recode(race, !!!race_encoding)) %>%`,
+referenced [here](https://github.com/statnet/ffsg/blob/1d7d3450b130964676f2f747088a71c197678638/Data/ffsgData/R/Harmonizer.R#L114)). What I did not understand was what the `!!!` operator accomplished. 
+I now understand that this operator is something really only makes sense in the
+context of R. 
+
+R allows one to have a list of named parameters, e.g.
+
+```{r}
+foo <- function(bar, baz) {print(bar - baz)}
+```
+The first argument is named `bar`, and the second is named `baz`. One can call 
+`foo()` in several ways
+
+1. `foo(1, 2)`
+2. `foo(bar=1, baz=2)`
+3. `foo(baz=2, bar=1)`
+
+In other words, R understands that parameters have names, and in the call of
+the function, if the name of the parameter is specified, the order doesn't
+matter. What this means in the context of my code is that for the line 
+
+```{r, eval=F}
+ mutate(race = recode(race, !!!race_encoding)) %>%
+```
+
+`!!!` expands the list `race_encoding` to that list's keys as paramter names,
+and values as argument. For example, if `race_encoding = list('foo'='bar')`,
+then `mutate(race = recode(race, !!!race_encoding)) %>%` would evaluate to 
+`mutate(race = recode(race, foo=bar)) %>%`. This is really a huge win for 
+software engineering here, because it means we can use `recode` with any
+general key-value pair without worrying about specifying which variables map to 
+which parameters.
+
+
+## Canon columns, and future work
+Right now, we assume that the three data sources share several fields:
+```{eval=F}
+name: The name of the victim
+age:  The age of the victim
+sex:  The gender of the victim
+race: The race of the victim
+date: The date of the victim's death
+zip:  The zipcode of the victim's death
+```
+These are the fields which were used for merging. Unfourtunately, Killed By Police
+does not have zip code, so I simply removed the check which makes sure that any
+data source being harmonized has at least these columns. When revisions are made
+to the merging part of `ffsgData`, this might be a sticking point.

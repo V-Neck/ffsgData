@@ -1,0 +1,117 @@
+devtools::use_vignette("my-vignette")---
+title: "Missingness"
+author: "Vaughn Johnson"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+FFSG has currently collected data from 4 data sources
+
+1. The US Census
+2. Fatal Encounters
+3. Mapping Police Violence
+4. Killed By Police
+
+The first data source is, generally speaking, complete and valid. Our challenge
+lies in the remaining three. Each data set contains information on police violence,
+where each row in the data set is a person who was killed by police, with information
+related to the deceased such as sex, race, age, as well as information
+relevant to their death, such as time of death and location. The challenge of
+collecting and harmonizing these three data sets so they follow similar coding
+and naming conventions is accomplished in the `Harmonizer.R` and `MasterScraper.R`
+files. The sraped and harmonized dataframes are stored in the `HarmonizedFiles`
+directory. To refresh these documents, simply `source(Harmonizer.R)`.
+
+## The Goal
+This document seeks to address the next problem, which is missingness
+between these three datasets. We want to uncover if there are any mechanisms
+behind missingness, and use that information to inform how we can impute missing 
+values, and also help with merging the three data sets.
+
+# The Datasets
+
+```{r, results="hide", message=FALSE}
+library(here)
+library(DT)
+library(tidyr)
+
+source(here::here(file.path('R', 'Harmonizer.R')))
+load(here::here(file.path("R", "HarmonizedFiles","HarmonizedDataSets.RData")))
+
+fe  =  fe_harmonized
+mpv = mpv_harmonized
+kbp = kbp_harmonized
+
+```
+
+Here are the three data scoures on Police Violence
+
+|Name|Abbreviation|Source URL|Live or archival|
+|---|---|---|---|---|---|---|---|
+|Killed By Police|`kbp`|[link](http://www.killedbypolice.net/)|Archival|
+|Mapping Police Violence|`mpv`|[link](https://mappingpoliceviolence.org/s/MPVDatasetDownload.xlsx)|Live|
+|Fatal Encounters|`fe`|[link](https://docs.google.com/spreadsheets/d/1dKmaV_JiWcG8XBoRgP8b4e9Eopkpgt7FL7nyspvzAsE/edit#gid=0)|Live|
+
+And here's another table with information about the dimensionality of the datasets.
+
+```{r, results="hide", echo=FALSE}
+cols = c('Name',
+         'Start Date',
+         'End Date',
+         'Number of Rows',
+         'Number of Columns',
+         'Fraction of dataset missing')
+
+info_table = data.frame(matrix(nrow=3, ncol=length(cols)))
+
+info_table = setNames(info_table, cols)
+
+get_data_set_info <- function(dataset) {
+    return( c(NA,
+              min(dataset$date, na.rm = T),
+              max(dataset$date, na.rm = T),
+              nrow(dataset),
+              ncol(dataset),
+              sum(is.na(dataset)) / (nrow(dataset) * ncol(dataset))))
+}
+
+info_table[1, ] = get_data_set_info(mpv)
+info_table[2, ] = get_data_set_info(kbp)
+info_table[3, ] = get_data_set_info(fe)
+info_table$Name = c("MPV", "KBP", "FE")
+info_table[, c('Number of Rows', 'Number of Columns', 'Fraction of dataset missing')] =     lapply(info_table[, c('Number of Rows', 'Number of Columns', 'Fraction of dataset missing')], as.numeric)
+info_table$`Fraction of dataset missing` = round(info_table$`Fraction of dataset missing`, 3)
+
+info_table
+```
+
+```{r, results = "asis", echo=FALSE}
+knitr::kable(info_table)
+```
+
+# Data Munging and Concatenation
+To describe missingness a little better, I'm going to take the field which are
+common between the three shooting datasets, and concatenate them, with an additional
+column remembering which rows belong to which data sets.
+
+```{r}
+common_cols = c('source', 'name', 'age', 'sex', 'race', 'date')
+fe['source'] = 'fe'
+mpv['source'] = 'mpv'
+kbp['source'] = 'kbp'
+
+combined = rbind(fe[common_cols], mpv[common_cols], kbp[common_cols])
+
+table(combined[c('source','race')], useNA = 'always') / sum(table(combined[c('source','race')], useNA = 'always'))
+```

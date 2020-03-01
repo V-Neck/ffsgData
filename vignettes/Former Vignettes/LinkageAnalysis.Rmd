@@ -1,0 +1,123 @@
+---
+title: "Linkage Analysis"
+author: "Vaughn Johnson"
+date: "5/17/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+path_to_src = here::here(file.path('R'))
+load(file=file.path(path_to_src,
+                         "FinalClassification",
+                         "classification.RData"))
+
+class_weights = data.frame("class" = classification$prediction, 
+                           "weight" = classification$Wdata) %>%
+                            mutate(class = recode(class, !!!list("L"="Match", "N"="Non-match")))
+
+ggplot(class_weights, aes(x=weight, 
+                          fill=class, 
+                          group=class)) +
+    geom_histogram(bins=50) +
+    ggtitle("Log Histogram of weights assigned to pairs") +
+    scale_y_log10() +
+    xlab("w(gamma)") +
+    ggsave("~/log_hist.png")
+
+ggplot(class_weights, aes(x=weight, 
+                          fill=class, 
+                          group=class)) +
+    geom_histogram(bins=50) +
+    ggtitle("Log Histogram of weights assigned to pairs") +
+    xlab("w(gamma)") +
+    ggsave("~/hist.png")
+```
+
+```{r}
+links_idx = classification$prediction == 'L'
+links = classification[['pairs']][links_idx, c('id1', 'id2')]
+
+link_depth = 7
+link_levels = list()
+link_levels[[1]] = links
+
+for (i in 2:link_depth) {
+    # Maintain strict ordering, such that id1 < id2 < id2, etc.
+    # This guarantees that there are no duplicates within 
+    # each link level
+    suffixes = c("", "_")
+    right_col = paste0("id", i)
+    new_col = paste0("id", i+1)
+   
+    link_levels[[i]] = merge(link_levels[[i - 1]], 
+                             links, 
+                             by.x=right_col, by.y='id1', 
+                             suffixes=suffixes)
+    
+    print(head(link_levels[[i]] ))
+    
+    link_levels[[i]] = link_levels[[i]] %>% 
+                    rename(list("id2_" = new_col))
+    
+    # Reorder Columns
+    sorted_cols = sort(colnames(link_levels[[i]]))
+    link_levels[[i]] = link_levels[[i]] %>% select(sorted_cols)
+}
+
+for (level in 1:(link_depth-1)) {
+    next_level_values = unique(c(as.matrix(link_levels[[level + 1]])))
+
+    rows = as.list(data.frame(t(link_levels[[level]])))
+
+    not_present = logical(length(rows))
+    
+    for (i in 1:length(rows)) {
+        row = rows[[i]]
+        not_present[i] = !any(row %in% next_level_values)
+    }
+    link_levels[[level]] = link_levels[[level]][not_present, ]
+}
+```
+
+```{r}
+library(venn)
+linked_sources = lapply(link_levels, function(x) {return(
+                            map_df(x, ~combined_harmonized[.x, 'source'])
+                        )})
+
+n_links = length((unlist(link_levels)))
+in_data_set = data.frame(matrix(ncol=4, nrow=n_links))
+
+colnames(in_data_set) = c("fe", "kbp", "mpv", "wapo")
+
+start_idx = 1
+for (i in 1:6) {
+    linkos = linked_sources[[i]]
+    temp_df = data.frame(matrix(ncol=4, nrow=nrow(linkos)))
+    colnames(temp_df) = c("fe", "kbp", "mpv", "wapo")
+    for (data_set in c("fe", "kbp", "mpv", "wapo")) {
+        in_data = as.vector(unlist(map(data.frame(t(linked_sources[[i]])), ~ data_set %in% .)))
+        temp_df[data_set] = in_data
+    }
+    in_data_set = rbind(temp_df, in_data_set)
+}
+
+
+c_idx = complete.cases(in_data_set)
+in_data_set = in_data_set[c_idx, ]
+venn(in_data_set, cexil=.95)
+
+```
+
+```{r}
+matched_ids = unique(unlist(link_levels))
+
+unmatched_ids = 
+```

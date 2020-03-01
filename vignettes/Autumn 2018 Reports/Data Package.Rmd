@@ -1,0 +1,26 @@
+---
+title: "Toward an ffsgData Package"
+author: "Vaughn Johnson"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Progress Made in 2018
+I've taken important steps this quarter towards making `ffsgData` a package
+which contains
+
+1. Scraping
+2. Harmonization
+3. Merging & Imputation
+
+I added R Oxygen comments to the scraping and harmonization modules, and 
+rearranged the files in a style which is consistent with R packages. A example
+of this work can be viewed [here](https://github.com/statnet/ffsg/blob/1d7d3450b130964676f2f747088a71c197678638/Data/ffsgData/R/Harmonizer.R#L1).
+
+# Intentions for 2019
+I would like to finish the doumentation process, and produce a legitimate R
+package which covers scraping and harmonization, without yet handling merging
+or imputation.

@@ -1,0 +1,76 @@
+---
+title: "Fatal Encounters"
+author: "Vaughn Johnson"
+date: "2018-12-05"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+# Fatal Encounters
+Fatal Encounters seeks to "create a comprehensive national database of people who are killed through interactions with police started with a simple question: How often does that happen?". It's maintained by D. Brian Burghart.
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+
+library(here)
+library(DT)
+library(tidyr)
+
+source(here::here(file.path('R', 'Harmonizing', 'Harmonizer.R')))
+load(here::here(file.path("R", 'Harmonizing', "HarmonizedFiles","HarmonizedDataSets.RData")))
+
+fe  =  fe_harmonized
+mpv = mpv_harmonized
+kbp = kbp_harmonized
+```
+
+
+```{r, echo=F}
+library(here)
+library(DT)
+library(tidyr)
+
+make_freq_table <- function(field, precision) {
+    freq_table = plyr::count(field)
+    
+    freq_table$'proportion' =  freq_table$freq / sum(freq_table$freq)
+    freq_table$'proportion' = round(freq_table$'proportion', 2)
+    
+    freq_table$'cumulative' = cumsum(freq_table$'proportion')
+    freq_table$'cumulative' =  round(freq_table$'cumulative', 2)
+    
+    return(freq_table)
+}
+
+display <- function(source, field) {
+    return(datatable(make_freq_table(source[,field], 3)))
+}
+```
+
+
+## Fatal Encounters
+```{r}
+display(fe, 'name')
+display(fe, 'age')
+display(fe, 'race')
+display(fe, 'sex')
+display(fe, 'zip')
+display(fe, 'date')
+
+display(fe, 'aka')
+display(fe, 'city')
+display(fe, 'state')
+display(fe, 'county')
+display(fe, 'agency')
+display(fe, 'causeOfDeath')
+display(fe, 'circumstances')
+display(fe, 'officialDisposition')
+display(fe, 'mentalIllness')
+display(fe, 'year')
+```
